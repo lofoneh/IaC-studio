@@ -2,64 +2,75 @@ package main
 
 import (
 	"context"
-	"engine/internal/server"
-	"fmt"
-	"log"
+	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
-	_ "github.com/joho/godotenv/autoload"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/iac-studio/engine/pkg/config"
+	"github.com/iac-studio/engine/pkg/logger"
+	"go.uber.org/zap"
 )
 
-func gracefulShutdown(fiberServer *server.FiberServer, done chan bool) {
-	// Create context that listens for the interrupt signal from the OS.
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
+func main() {
+	cfg := config.MustLoad()
+	log, err := logger.Init(cfg.LogLevel, cfg.LogFormat)
+	if err != nil {
+		// last resort fallback
+		panic(err)
+	}
+	defer logger.Sync()
 
-	// Listen for the interrupt signal.
-	<-ctx.Done()
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
 
-	log.Println("shutting down gracefully, press Ctrl+C again to force")
-	stop() // Allow Ctrl+C to force shutdown
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
 
-	// The context is used to inform the server it has 5 seconds to finish
-	// the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := fiberServer.ShutdownWithContext(ctx); err != nil {
-		log.Printf("Server forced to shutdown with error: %v", err)
+	srv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       90 * time.Second,
 	}
 
-	log.Println("Server exiting")
-
-	// Notify the main goroutine that the shutdown is complete
-	done <- true
-}
-
-func main() {
-
-	server := server.New()
-
-	server.RegisterFiberRoutes()
-
-	// Create a done channel to signal when the shutdown is complete
-	done := make(chan bool, 1)
-
+	// graceful shutdown
+	errCh := make(chan error, 1)
 	go func() {
-		port, _ := strconv.Atoi(os.Getenv("PORT"))
-		err := server.Listen(fmt.Sprintf(":%d", port))
-		if err != nil {
-			panic(fmt.Sprintf("http server error: %s", err))
+		log.Info("HTTP server starting", zap.String("addr", cfg.HTTPAddr))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- err
 		}
 	}()
 
-	// Run graceful shutdown in a separate goroutine
-	go gracefulShutdown(server, done)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// Wait for the graceful shutdown to complete
-	<-done
-	log.Println("Graceful shutdown complete.")
+	select {
+	case sig := <-sigCh:
+		log.Info("shutdown signal received", zap.String("signal", sig.String()))
+	case err := <-errCh:
+		log.Error("server error", zap.Error(err))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error("server shutdown error", zap.Error(err))
+	} else {
+		log.Info("server exited gracefully")
+	}
 }

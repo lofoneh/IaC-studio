@@ -1,49 +1,51 @@
-# Simple Makefile for a Go project
+SHELL := /usr/bin/env bash
 
-# Build the application
-all: build test
+APP_NAME := iac-engine
+API_CMD := ./cmd/api
+WORKER_CMD := ./cmd/worker
+MIGRATE_CMD := ./cmd/migrate
+
+GO_FLAGS := -trimpath
+LDFLAGS := -s -w
+
+.PHONY: all build api worker test lint dev migrate run-api run-worker tidy deps clean
+
+all: build
+
+deps:
+	cd apps/engine && go mod tidy
 
 build:
-	@echo "Building..."
-	
-	
-	@go build -o main.exe cmd/api/main.go
+	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/api $(API_CMD)
+	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/worker $(WORKER_CMD)
+	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/migrate $(MIGRATE_CMD)
 
-# Run the application
-run:
-	@go run cmd/api/main.go
-# Create DB container
-docker-run:
-	@docker compose up --build
+api:
+	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/api $(API_CMD)
 
-# Shutdown DB container
-docker-down:
-	@docker compose down
+worker:
+	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/worker $(WORKER_CMD)
 
-# Test the application
+run-api:
+	cd apps/engine && go run $(API_CMD)
+
+run-worker:
+	cd apps/engine && go run $(WORKER_CMD)
+
+migrate:
+	cd apps/engine && go run $(MIGRATE_CMD)
+
 test:
-	@echo "Testing..."
-	@go test ./... -v
-# Integrations Tests for the application
-itest:
-	@echo "Running integration tests..."
-	@go test ./internal/database -v
+	cd apps/engine && go test ./...
 
-# Clean the binary
+lint:
+	cd apps/engine && go vet ./...
+
+dev: 
+	$(MAKE) -j2 run-api run-worker
+
+tidy:
+	cd apps/engine && go mod tidy
+
 clean:
-	@echo "Cleaning..."
-	@rm -f main
-
-# Live Reload
-watch:
-	@powershell -ExecutionPolicy Bypass -Command "if (Get-Command air -ErrorAction SilentlyContinue) { \
-		air; \
-		Write-Output 'Watching...'; \
-	} else { \
-		Write-Output 'Installing air...'; \
-		go install github.com/air-verse/air@latest; \
-		air; \
-		Write-Output 'Watching...'; \
-	}"
-
-.PHONY: all build run test clean watch docker-run docker-down itest
+	rm -rf apps/engine/bin
