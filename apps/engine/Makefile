@@ -13,39 +13,45 @@ LDFLAGS := -s -w
 all: build
 
 deps:
-	cd apps/engine && go mod tidy
+	go mod tidy
 
 build:
-	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/api $(API_CMD)
-	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/worker $(WORKER_CMD)
-	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/migrate $(MIGRATE_CMD)
+	go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/api $(API_CMD)
+	go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/worker $(WORKER_CMD)
+	go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/migrate $(MIGRATE_CMD)
 
 api:
-	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/api $(API_CMD)
+	go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/api $(API_CMD)
 
 worker:
-	cd apps/engine && go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/worker $(WORKER_CMD)
+	go build $(GO_FLAGS) -ldflags "$(LDFLAGS)" -o bin/worker $(WORKER_CMD)
 
 run-api:
-	cd apps/engine && go run $(API_CMD)
+	go run $(API_CMD)
 
 run-worker:
-	cd apps/engine && go run $(WORKER_CMD)
+	go run $(WORKER_CMD)
 
 migrate:
-	cd apps/engine && go run $(MIGRATE_CMD)
+	go run $(MIGRATE_CMD)
 
 test:
-	cd apps/engine && go test ./...
+	go test ./...
 
 lint:
-	cd apps/engine && go vet ./...
+	go vet ./...
 
 dev: 
 	$(MAKE) -j2 run-api run-worker
 
 tidy:
-	cd apps/engine && go mod tidy
+	go mod tidy
 
 clean:
-	rm -rf apps/engine/bin
+	rm -rf bin
+
+docker-up:
+	docker compose up --build -d
+
+docker-down:
+	docker compose down -v

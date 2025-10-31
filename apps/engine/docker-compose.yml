@@ -1,15 +1,95 @@
+version: "3.9"
+
 services:
-  psql_bp:
-    image: postgres:latest
-    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    container_name: iac_engine_postgres
     environment:
-      POSTGRES_DB: ${BLUEPRINT_DB_DATABASE}
-      POSTGRES_USER: ${BLUEPRINT_DB_USERNAME}
-      POSTGRES_PASSWORD: ${BLUEPRINT_DB_PASSWORD}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: iac_studio
     ports:
-      - "${BLUEPRINT_DB_PORT}:5432"
+      - "5432:5432"
     volumes:
-      - psql_volume_bp:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: iac_engine_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  asynqmon:
+    image: hibiken/asynqmon:latest
+    container_name: iac_engine_asynqmon
+    ports:
+      - "8081:8080"
+    command: ["--redis-addr=redis:6379"]
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iac_engine_api
+    command: ["go", "run", "./cmd/api"]
+    environment:
+      APP_ENV: development
+      HTTP_ADDR: 0.0.0.0:8080
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      ASYNQ_CONCURRENCY: 10
+      GOMAXPROCS: 0
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    working_dir: /app
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iac_engine_worker
+    command: ["go", "run", "./cmd/worker"]
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      ASYNQ_CONCURRENCY: 10
+      GOMAXPROCS: 0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    working_dir: /app
 
 volumes:
-  psql_volume_bp:
+  db_data: {}
+

@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS cloud_accounts;
+DROP TABLE IF EXISTS resources;
+DROP TABLE IF EXISTS deployments;
+DROP TABLE IF EXISTS project_graphs;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS users;
+
