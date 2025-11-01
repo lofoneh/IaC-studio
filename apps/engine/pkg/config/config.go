@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -15,7 +14,8 @@ import (
 // Config holds application configuration loaded from environment variables or config files.
 type Config struct {
 	AppEnv          string        `mapstructure:"APP_ENV" validate:"required,oneof=development staging production test"`
-	HTTPAddr        string        `mapstructure:"HTTP_ADDR" validate:"required,hostname_port|ip_port"`
+	//HTTPAddr        string        `mapstructure:"HTTP_ADDR" validate:"required,hostname_port|ip_port"`
+	HTTPAddr string `mapstructure:"HTTP_ADDR" validate:"required,hostname_port"`
 	ShutdownTimeout time.Duration `mapstructure:"SHUTDOWN_TIMEOUT" validate:"required"`
 
 	LogLevel  string `mapstructure:"LOG_LEVEL" validate:"required,oneof=debug info warn error dpanic panic fatal"`
@@ -23,7 +23,8 @@ type Config struct {
 
 	DatabaseURL string `mapstructure:"DATABASE_URL" validate:"required,url|uri"`
 
-	RedisAddr     string `mapstructure:"REDIS_ADDR" validate:"required,hostname_port|ip_port"`
+	//RedisAddr     string `mapstructure:"REDIS_ADDR" validate:"required,hostname_port|ip_port"`
+	RedisAddr string `mapstructure:"REDIS_ADDR" validate:"required,hostname_port"`
 	RedisPassword string `mapstructure:"REDIS_PASSWORD"`
 
 	AsynqConcurrency int `mapstructure:"ASYNQ_CONCURRENCY" validate:"gte=1,lte=1000"`
@@ -48,8 +49,8 @@ func Load() (*Config, error) {
 	v.AddConfigPath(".")
 	v.AddConfigPath("./apps/engine")
 
-	v.SetEnvPrefix("IAC")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	// v.SetEnvPrefix("IAC")
+	// v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
 	// Defaults
