@@ -13,9 +13,9 @@ import (
 
 // Config holds application configuration loaded from environment variables or config files.
 type Config struct {
-	AppEnv          string        `mapstructure:"APP_ENV" validate:"required,oneof=development staging production test"`
+	AppEnv string `mapstructure:"APP_ENV" validate:"required,oneof=development staging production test"`
 	//HTTPAddr        string        `mapstructure:"HTTP_ADDR" validate:"required,hostname_port|ip_port"`
-	HTTPAddr string `mapstructure:"HTTP_ADDR" validate:"required,hostname_port"`
+	HTTPAddr        string        `mapstructure:"HTTP_ADDR" validate:"required,hostname_port"`
 	ShutdownTimeout time.Duration `mapstructure:"SHUTDOWN_TIMEOUT" validate:"required"`
 
 	LogLevel  string `mapstructure:"LOG_LEVEL" validate:"required,oneof=debug info warn error dpanic panic fatal"`
@@ -24,7 +24,7 @@ type Config struct {
 	DatabaseURL string `mapstructure:"DATABASE_URL" validate:"required,url|uri"`
 
 	//RedisAddr     string `mapstructure:"REDIS_ADDR" validate:"required,hostname_port|ip_port"`
-	RedisAddr string `mapstructure:"REDIS_ADDR" validate:"required,hostname_port"`
+	RedisAddr     string `mapstructure:"REDIS_ADDR" validate:"required,hostname_port"`
 	RedisPassword string `mapstructure:"REDIS_PASSWORD"`
 
 	AsynqConcurrency int `mapstructure:"ASYNQ_CONCURRENCY" validate:"gte=1,lte=1000"`
@@ -41,6 +41,7 @@ var (
 // applies defaults, binds env vars, and validates the result.
 func Load() (*Config, error) {
 	// Load .env if present (non-fatal)
+	_ = godotenv.Load(".env.local")
 	_ = godotenv.Load()
 
 	v := viper.New()

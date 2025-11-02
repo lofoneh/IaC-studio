@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-iac_studio}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
@@ -44,7 +44,7 @@ services:
     image: hibiken/asynqmon:latest
     container_name: iac_engine_asynqmon
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}  # Added for command substitution
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
       - "${ASYNQMON_PORT:-8081}:8080"
     command: >
@@ -70,7 +70,7 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-json}
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable}
       REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}  # Removed :- default
+      REDIS_PASSWORD: ${REDIS_PASSWORD}  
       ASYNQ_CONCURRENCY: ${ASYNQ_CONCURRENCY:-10}
       GOMAXPROCS: ${GOMAXPROCS:-0}
     ports:
@@ -96,7 +96,7 @@ services:
       LOG_FORMAT: ${LOG_FORMAT:-json}
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable}
       REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD}  # Consistent with API
+      REDIS_PASSWORD: ${REDIS_PASSWORD}  
       ASYNQ_CONCURRENCY: ${ASYNQ_CONCURRENCY:-10}
       GOMAXPROCS: ${GOMAXPROCS:-0}
     depends_on:
