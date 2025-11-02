@@ -1,19 +1,17 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:17-alpine
     container_name: iac_engine_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: iac_studio
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-iac_studio}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -21,10 +19,23 @@ services:
   redis:
     image: redis:7-alpine
     container_name: iac_engine_redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD} 
+    command: >
+      sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then
+        redis-server --requirepass $$REDIS_PASSWORD;
+      else
+        redis-server;
+      fi"
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: >
+        sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then
+          redis-cli -a $$REDIS_PASSWORD ping;
+        else
+          redis-cli ping;
+        fi"
       interval: 5s
       timeout: 3s
       retries: 20
@@ -32,9 +43,16 @@ services:
   asynqmon:
     image: hibiken/asynqmon:latest
     container_name: iac_engine_asynqmon
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
     ports:
-      - "8081:8080"
-    command: ["--redis-addr=redis:6379"]
+      - "${ASYNQMON_PORT:-8081}:8080"
+    command: >
+      sh -c "if [ -n \"$$REDIS_PASSWORD\" ]; then
+        /usr/local/bin/asynqmon --redis-addr=redis:6379 --redis-password=$$REDIS_PASSWORD;
+      else
+        /usr/local/bin/asynqmon --redis-addr=redis:6379;
+      fi"
     depends_on:
       redis:
         condition: service_healthy
@@ -46,17 +64,17 @@ services:
     container_name: iac_engine_api
     command: ["go", "run", "./cmd/api"]
     environment:
-      APP_ENV: development
-      HTTP_ADDR: 0.0.0.0:8080
-      LOG_LEVEL: info
-      LOG_FORMAT: json
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable
-      REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: ""
-      ASYNQ_CONCURRENCY: 10
-      GOMAXPROCS: 0
+      APP_ENV: ${APP_ENV:-development}
+      HTTP_ADDR: ${HTTP_ADDR:-0.0.0.0:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}  
+      ASYNQ_CONCURRENCY: ${ASYNQ_CONCURRENCY:-10}
+      GOMAXPROCS: ${GOMAXPROCS:-0}
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -73,14 +91,14 @@ services:
     container_name: iac_engine_worker
     command: ["go", "run", "./cmd/worker"]
     environment:
-      APP_ENV: development
-      LOG_LEVEL: info
-      LOG_FORMAT: json
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable
-      REDIS_ADDR: redis:6379
-      REDIS_PASSWORD: ""
-      ASYNQ_CONCURRENCY: 10
-      GOMAXPROCS: 0
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/iac_studio?sslmode=disable}
+      REDIS_ADDR: ${REDIS_ADDR:-redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}  
+      ASYNQ_CONCURRENCY: ${ASYNQ_CONCURRENCY:-10}
+      GOMAXPROCS: ${GOMAXPROCS:-0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -92,4 +110,3 @@ services:
 
 volumes:
   db_data: {}
-

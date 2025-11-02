@@ -24,6 +24,8 @@ tmp/
 
 # .env file
 .env
+.env.local
+.env.*.local
 
 # Project build
 main
