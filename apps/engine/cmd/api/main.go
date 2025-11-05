@@ -15,30 +15,7 @@ import (
 	"github.com/iac-studio/engine/pkg/database"
 	"github.com/iac-studio/engine/pkg/logger"
 	"go.uber.org/zap"
-
-	// Import generated docs (will be created after running swag init)
-	_ "github.com/iac-studio/engine/docs"
 )
-
-// @title           IaC Studio API
-// @version         1.0
-// @description     Infrastructure as Code management platform with AI-powered recommendations
-// @termsOfService  https://iacstudio.io/terms
-
-// @contact.name   IaC Studio Support
-// @contact.url    https://iacstudio.io/support
-// @contact.email  support@iacstudio.io
-
-// @license.name  MIT
-// @license.url   https://opensource.org/licenses/MIT
-
-// @host      localhost:8080
-// @BasePath  /api/v1
-
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-// @description Type "Bearer" followed by a space and JWT token.
 
 func main() {
 	// Load configuration
@@ -66,6 +43,8 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
+	projectRepo := repository.NewProjectRepository(db)
+	deploymentRepo := repository.NewDeploymentRepository(db)
 
 	// JWT Secret from environment
 	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
@@ -76,11 +55,17 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(userRepo, jwtSecret)
+	projectsHandler := handlers.NewProjectsHandler(projectRepo, nil) // nil validator for now
+	deploymentsHandler := handlers.NewDeploymentsHandler(deploymentRepo)
+	graphsHandler := handlers.NewGraphsHandler()
 
 	// Create router with dependencies
 	router := api.NewRouter(api.Dependencies{
-		HMACSecret:  jwtSecret,
-		AuthHandler: authHandler,
+		HMACSecret:         jwtSecret,
+		AuthHandler:        authHandler,
+		ProjectsHandler:    projectsHandler,
+		DeploymentsHandler: deploymentsHandler,
+		GraphsHandler:      graphsHandler,
 	})
 
 	// Create HTTP server

@@ -2,14 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"net/http"
+	"strconv"
+
 	"github.com/google/uuid"
 	"github.com/iac-studio/engine/internal/api/middleware"
 	"github.com/iac-studio/engine/internal/api/types"
 	"github.com/iac-studio/engine/internal/api/validators"
 	"github.com/iac-studio/engine/internal/models"
 	"github.com/iac-studio/engine/internal/repository"
-	"net/http"
-	"strconv"
 )
 
 type ProjectsHandler struct {
@@ -73,9 +74,16 @@ func (h *ProjectsHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
+	// Marshal first to avoid sending headers/status then failing while encoding.
+	b, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	_, _ = w.Write(b)
 }
 
 func writeError(w http.ResponseWriter, status int, err error) {
@@ -83,5 +91,5 @@ func writeError(w http.ResponseWriter, status int, err error) {
 }
 
 func writeErrorStr(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, types.APIResponse{Success: false, Error: &types.APIError{Code: "invalid", Message: msg}})
+	writeJSON(w, status, types.APIResponse{Success: false, Error: &types.APIError{Code: http.StatusText(status), Message: msg}})
 }

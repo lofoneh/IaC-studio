@@ -2,18 +2,18 @@ package api
 
 import (
 	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	chimid "github.com/go-chi/chi/v5/middleware"
-	httpSwagger "github.com/swaggo/http-swagger"
-
 	"github.com/iac-studio/engine/internal/api/handlers"
 	mw "github.com/iac-studio/engine/internal/api/middleware"
 )
 
 type Dependencies struct {
-	HMACSecret  []byte
-	AuthHandler *handlers.AuthHandler
+	HMACSecret         []byte
+	AuthHandler        *handlers.AuthHandler
+	ProjectsHandler    *handlers.ProjectsHandler
+	DeploymentsHandler *handlers.DeploymentsHandler
+	GraphsHandler      *handlers.GraphsHandler
 }
 
 func NewRouter(dep Dependencies) http.Handler {
@@ -32,14 +32,8 @@ func NewRouter(dep Dependencies) http.Handler {
 	r.Get("/healthz", hh.Liveness)
 	r.Get("/readyz", hh.Readiness)
 
-	// Swagger documentation
-	r.Get("/docs/*", httpSwagger.Handler(
-		httpSwagger.URL("http://localhost:8080/docs/doc.json"), // The url pointing to API definition
-	))
-
-	// API routes
 	r.Route("/api/v1", func(api chi.Router) {
-		// Auth routes (public)
+		// Auth routes (public - no auth required)
 		api.Route("/auth", func(ar chi.Router) {
 			ar.Post("/register", dep.AuthHandler.Register)
 			ar.Post("/login", dep.AuthHandler.Login)
@@ -47,32 +41,37 @@ func NewRouter(dep Dependencies) http.Handler {
 			ar.Post("/refresh", dep.AuthHandler.Refresh)
 		})
 
-		// Protected routes
+		// Protected routes (require authentication)
 		api.Group(func(protected chi.Router) {
 			protected.Use(mw.Auth(dep.HMACSecret))
 
+			// Projects
 			protected.Route("/projects", func(pr chi.Router) {
-				pr.Get("/", func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(200)
-					w.Write([]byte("[]"))
-				})
+				pr.Get("/", dep.ProjectsHandler.List)
+				pr.Post("/", dep.ProjectsHandler.Create)
 				pr.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(200)
-					w.Write([]byte("{}"))
+					w.Write([]byte(`{"success":true,"data":{}}`))
 				})
 			})
 
+			// Deployments
 			protected.Route("/deployments", func(dr chi.Router) {
-				dr.Get("/", func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(200)
-					w.Write([]byte("[]"))
-				})
+				dr.Get("/", dep.DeploymentsHandler.List)
+				dr.Post("/", dep.DeploymentsHandler.Create)
 			})
 
+			// Graphs
+			protected.Route("/graphs", func(gr chi.Router) {
+				gr.Post("/save", dep.GraphsHandler.Save)
+				gr.Get("/load", dep.GraphsHandler.Load)
+			})
+
+			// AI (placeholder)
 			protected.Route("/ai", func(ar chi.Router) {
 				ar.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(200)
-					w.Write([]byte("{}"))
+					w.Write([]byte(`{"success":true,"data":{"status":"ready"}}`))
 				})
 			})
 		})
