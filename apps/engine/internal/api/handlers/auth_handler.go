@@ -22,63 +22,37 @@ func NewAuthHandler(users repository.UserRepository, secret []byte) *AuthHandler
 	return &AuthHandler{users: users, hmacSecret: secret}
 }
 
-// RegisterRequest represents the registration payload
-type RegisterRequest struct {
-	Email    string `json:"email" example:"user@example.com"`
-	Password string `json:"password" example:"password123"`
-	Name     string `json:"name" example:"John Doe"`
-}
-
-// LoginRequest represents the login payload
-type LoginRequest struct {
-	Email    string `json:"email" example:"user@example.com"`
-	Password string `json:"password" example:"password123"`
-}
-
-// AuthResponse represents the authentication response
-type AuthResponse struct {
-	AccessToken string      `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	TokenType   string      `json:"token_type" example:"Bearer"`
-	ExpiresIn   int         `json:"expires_in" example:"86400"`
-	User        models.User `json:"user"`
-}
-
-// Register godoc
-// @Summary      Register a new user
-// @Description  Create a new user account with email and password
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Param        request body RegisterRequest true "Registration details"
-// @Success      201 {object} types.APIResponse{data=map[string]interface{}}
-// @Failure      400 {object} types.APIResponse{error=types.APIError}
-// @Failure      409 {object} types.APIResponse{error=types.APIError}
-// @Failure      500 {object} types.APIResponse{error=types.APIError}
-// @Router       /auth/register [post]
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req RegisterRequest
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErrorStr(w, 400, "invalid json")
+		writeErrorStr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 
 	// Validate input
 	if req.Email == "" || req.Password == "" || req.Name == "" {
-		writeErrorStr(w, 400, "email, password, and name are required")
+		writeErrorStr(w, http.StatusBadRequest, "email, password, and name are required")
 		return
 	}
 
 	if len(req.Password) < 8 {
-		writeErrorStr(w, 400, "password must be at least 8 characters")
+		writeErrorStr(w, http.StatusBadRequest, "password must be at least 8 characters")
 		return
 	}
 
+	// Hash password
 	ph, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		writeError(w, 500, err)
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
+	// Create user
 	u := models.User{
 		Email:        req.Email,
 		PasswordHash: string(ph),
@@ -86,11 +60,11 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.users.Create(r.Context(), &u); err != nil {
-		writeErrorStr(w, 409, "email already exists")
+		writeErrorStr(w, http.StatusConflict, "email already exists")
 		return
 	}
 
-	writeJSON(w, 201, types.APIResponse{
+	writeJSON(w, http.StatusCreated, types.APIResponse{
 		Success: true,
 		Data: map[string]any{
 			"id":    u.ID,
@@ -100,56 +74,51 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Login godoc
-// @Summary      Login
-// @Description  Authenticate user and return JWT token
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Param        request body LoginRequest true "Login credentials"
-// @Success      200 {object} types.APIResponse{data=AuthResponse}
-// @Failure      400 {object} types.APIResponse{error=types.APIError}
-// @Failure      401 {object} types.APIResponse{error=types.APIError}
-// @Failure      500 {object} types.APIResponse{error=types.APIError}
-// @Router       /auth/login [post]
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
-	var req LoginRequest
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErrorStr(w, 400, "invalid json")
+		writeErrorStr(w, http.StatusBadRequest, "invalid json")
 		return
 	}
 
 	if req.Email == "" || req.Password == "" {
-		writeErrorStr(w, 400, "email and password are required")
+		writeErrorStr(w, http.StatusBadRequest, "email and password are required")
 		return
 	}
 
+	// Get user
 	var u models.User
 	if err := h.users.GetByEmail(r.Context(), req.Email, &u); err != nil {
-		writeErrorStr(w, 401, "invalid credentials")
+		writeErrorStr(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
-	if bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)) != nil {
-		writeErrorStr(w, 401, "invalid credentials")
+	// Verify password
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
+		writeErrorStr(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
+	// Generate JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": u.ID.String(),
 		"exp": time.Now().Add(24 * time.Hour).Unix(),
 	})
 
-	s, err := token.SignedString(h.hmacSecret)
+	tokenString, err := token.SignedString(h.hmacSecret)
 	if err != nil {
-		writeError(w, 500, err)
+		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
 
-	writeJSON(w, 200, types.APIResponse{
+	writeJSON(w, http.StatusOK, types.APIResponse{
 		Success: true,
 		Data: map[string]any{
-			"access_token": s,
+			"access_token": tokenString,
 			"token_type":   "Bearer",
 			"expires_in":   86400,
 			"user": map[string]any{
@@ -161,56 +130,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// Logout godoc
-// @Summary      Logout
-// @Description  Logout user (client-side token removal)
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Success      200 {object} types.APIResponse
-// @Router       /auth/logout [post]
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, 200, types.APIResponse{Success: true})
+	writeJSON(w, http.StatusOK, types.APIResponse{Success: true})
 }
 
-// Refresh godoc
-// @Summary      Refresh token
-// @Description  Refresh JWT token (not implemented yet)
-// @Tags         auth
-// @Accept       json
-// @Produce      json
-// @Security     BearerAuth
-// @Success      200 {object} types.APIResponse
-// @Failure      501 {object} types.APIResponse
-// @Router       /auth/refresh [post]
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "not implemented", http.StatusNotImplemented)
 }
-
-// Helper functions
-// func writeJSON(w http.ResponseWriter, status int, v interface{}) {
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.WriteHeader(status)
-// 	json.NewEncoder(w).Encode(v)
-// }
-
-// func writeError(w http.ResponseWriter, status int, err error) {
-// 	writeJSON(w, status, types.APIResponse{
-// 		Success: false,
-// 		Error: &types.APIError{
-// 			Code:    http.StatusText(status),
-// 			Message: err.Error(),
-// 		},
-// 	})
-// }
-
-// func writeErrorStr(w http.ResponseWriter, status int, message string) {
-// 	writeJSON(w, status, types.APIResponse{
-// 		Success: false,
-// 		Error: &types.APIError{
-// 			Code:    http.StatusText(status),
-// 			Message: message,
-// 		},
-// 	})
-// }
