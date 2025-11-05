@@ -3,7 +3,6 @@ package handlers
 import (
     "net/http"
     "github.com/google/uuid"
-    "github.com/iac-studio/engine/internal/api/middleware"
     "github.com/iac-studio/engine/internal/api/types"
     "github.com/iac-studio/engine/internal/repository"
 )
@@ -25,6 +24,6 @@ func (h *DeploymentsHandler) Create(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, http.StatusCreated, types.APIResponse{ Success: true })
 }
 
-func getUserID(r *http.Request) string { return middleware.GetUserID(r.Context()) }
+
 
 
