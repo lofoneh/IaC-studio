@@ -1,5 +1,25 @@
 package main
 
+// @title           IaC Studio API
+// @version         1.0
+// @description     Infrastructure as Code management platform with AI-powered recommendations
+// @termsOfService  https://iacstudio.io/terms
+
+// @contact.name   IaC Studio Support
+// @contact.url    https://iacstudio.io/support
+// @contact.email  support@iacstudio.io
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
 import (
 	"context"
 	"net/http"
@@ -15,6 +35,8 @@ import (
 	"github.com/iac-studio/engine/pkg/database"
 	"github.com/iac-studio/engine/pkg/logger"
 	"go.uber.org/zap"
+
+	_ "github.com/iac-studio/engine/docs"
 )
 
 func main() {
