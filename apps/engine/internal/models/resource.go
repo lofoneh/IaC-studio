@@ -14,11 +14,8 @@ type Resource struct {
 	DeploymentID uuid.UUID      `gorm:"type:uuid;index;not null" json:"deployment_id" validate:"required"`
 	ResourceType string         `gorm:"type:varchar(64);index;not null" json:"resource_type" validate:"required"`
 	ResourceName string         `gorm:"type:varchar(128);index;not null" json:"resource_name" validate:"required"`
-	Properties   datatypes.JSON `gorm:"type:jsonb" json:"properties"`
+	Properties   datatypes.JSON `gorm:"type:jsonb" json:"properties" swaggertype:"object"`
 	CreatedAt    time.Time      `json:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at"`
-	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
+	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-" swaggerignore:"true"`
 }
-
-
-

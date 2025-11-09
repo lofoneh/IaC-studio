@@ -15,12 +15,9 @@ type Project struct {
 	Name          string         `gorm:"not null;index:idx_projects_user_name,unique" json:"name" validate:"required"`
 	Description   string         `gorm:"type:text" json:"description"`
 	CloudProvider string         `gorm:"type:varchar(32);index" json:"cloud_provider" validate:"required,oneof=aws gcp azure do"`
-	Settings      datatypes.JSON `gorm:"type:jsonb" json:"settings"`
+	Settings      datatypes.JSON `gorm:"type:jsonb" json:"settings" swaggertype:"object"`
 	Archived      bool           `gorm:"not null;default:false;index" json:"archived"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
-	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-" swaggerignore:"true"`
 }
-
-
-
