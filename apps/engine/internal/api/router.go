@@ -2,8 +2,11 @@ package api
 
 import (
 	"net/http"
+	
 	"github.com/go-chi/chi/v5"
 	chimid "github.com/go-chi/chi/v5/middleware"
+	httpSwagger "github.com/swaggo/http-swagger"
+	
 	"github.com/iac-studio/engine/internal/api/handlers"
 	mw "github.com/iac-studio/engine/internal/api/middleware"
 )
@@ -32,8 +35,13 @@ func NewRouter(dep Dependencies) http.Handler {
 	r.Get("/healthz", hh.Liveness)
 	r.Get("/readyz", hh.Readiness)
 
+	// Swagger documentation
+	r.Get("/docs/*", httpSwagger.Handler(
+		httpSwagger.URL("http://localhost:8080/docs/doc.json"),
+	))
+
 	r.Route("/api/v1", func(api chi.Router) {
-		// Auth routes (public - no auth required)
+		// Auth routes (public)
 		api.Route("/auth", func(ar chi.Router) {
 			ar.Post("/register", dep.AuthHandler.Register)
 			ar.Post("/login", dep.AuthHandler.Login)
@@ -41,7 +49,7 @@ func NewRouter(dep Dependencies) http.Handler {
 			ar.Post("/refresh", dep.AuthHandler.Refresh)
 		})
 
-		// Protected routes (require authentication)
+		// Protected routes
 		api.Group(func(protected chi.Router) {
 			protected.Use(mw.Auth(dep.HMACSecret))
 
@@ -49,11 +57,11 @@ func NewRouter(dep Dependencies) http.Handler {
 			protected.Route("/projects", func(pr chi.Router) {
 				pr.Get("/", dep.ProjectsHandler.List)
 				pr.Post("/", dep.ProjectsHandler.Create)
-				pr.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
-					w.WriteHeader(200)
-					w.Write([]byte(`{"success":true,"data":{}}`))
-				})
+				pr.Get("/{id}", dep.ProjectsHandler.Get)
+				pr.Put("/{id}", dep.ProjectsHandler.Update)
+				pr.Delete("/{id}", dep.ProjectsHandler.Delete)
 			})
+
 
 			// Deployments
 			protected.Route("/deployments", func(dr chi.Router) {
@@ -67,7 +75,7 @@ func NewRouter(dep Dependencies) http.Handler {
 				gr.Get("/load", dep.GraphsHandler.Load)
 			})
 
-			// AI (placeholder)
+			// AI
 			protected.Route("/ai", func(ar chi.Router) {
 				ar.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(200)
