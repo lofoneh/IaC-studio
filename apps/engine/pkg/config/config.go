@@ -30,6 +30,10 @@ type Config struct {
 	AsynqConcurrency int `mapstructure:"ASYNQ_CONCURRENCY" validate:"gte=1,lte=1000"`
 
 	GoMaxProcs int `mapstructure:"GOMAXPROCS" validate:"gte=0,lte=4096"`
+	// WorkingDir is an optional base directory used by components that need a
+	// per-deployment working directory (e.g. terraform execution). If empty
+	// the system temp dir will be used.
+	WorkingDir string `mapstructure:"WORKING_DIR"`
 }
 
 var (
@@ -62,6 +66,7 @@ func Load() (*Config, error) {
 	v.SetDefault("LOG_FORMAT", "json")
 	v.SetDefault("ASYNQ_CONCURRENCY", 10)
 	v.SetDefault("GOMAXPROCS", 0)
+	v.SetDefault("WORKING_DIR", "")
 
 	// Optional config file
 	_ = v.ReadInConfig()
@@ -78,6 +83,7 @@ func Load() (*Config, error) {
 		"REDIS_PASSWORD",
 		"ASYNQ_CONCURRENCY",
 		"GOMAXPROCS",
+		"WORKING_DIR",
 	}
 	for _, key := range keys {
 		_ = v.BindEnv(key)
