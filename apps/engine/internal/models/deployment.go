@@ -14,12 +14,9 @@ type Deployment struct {
 	ProjectID      uuid.UUID      `gorm:"type:uuid;index;not null" json:"project_id" validate:"required"`
 	GraphID        uuid.UUID      `gorm:"type:uuid;index;not null" json:"graph_id" validate:"required"`
 	Status         string         `gorm:"type:varchar(32);index;not null" json:"status" validate:"required,oneof=pending planning applying completed failed"`
-	TerraformState datatypes.JSON `gorm:"type:jsonb" json:"terraform_state"`
-	Outputs        datatypes.JSON `gorm:"type:jsonb" json:"outputs"`
+	TerraformState datatypes.JSON `gorm:"type:jsonb" json:"terraform_state" swaggertype:"object"`
+	Outputs        datatypes.JSON `gorm:"type:jsonb" json:"outputs" swaggertype:"object"`
 	CreatedAt      time.Time      `json:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-" swaggerignore:"true"`
 }
-
-
-

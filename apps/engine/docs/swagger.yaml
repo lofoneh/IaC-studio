@@ -1,55 +1,63 @@
 basePath: /api/v1
 definitions:
-  handlers.AuthResponse:
+  handlers.CreateProjectRequest:
     properties:
-      access_token:
-        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+      cloud_provider:
+        enum:
+        - aws
+        - gcp
+        - azure
+        - do
+        example: aws
         type: string
-      expires_in:
-        example: 86400
-        type: integer
-      token_type:
-        example: Bearer
-        type: string
-      user:
-        $ref: '#/definitions/models.User'
-    type: object
-  handlers.LoginRequest:
-    properties:
-      email:
-        example: user@example.com
-        type: string
-      password:
-        example: password123
-        type: string
-    type: object
-  handlers.RegisterRequest:
-    properties:
-      email:
-        example: user@example.com
+      description:
+        example: Production infrastructure for web application
         type: string
       name:
-        example: John Doe
-        type: string
-      password:
-        example: password123
+        example: My AWS Infrastructure
         type: string
     type: object
-  models.User:
+  handlers.UpdateProjectRequest:
     properties:
+      archived:
+        example: false
+        type: boolean
+      cloud_provider:
+        example: aws
+        type: string
+      description:
+        example: Updated description
+        type: string
+    type: object
+  models.Project:
+    properties:
+      archived:
+        type: boolean
+      cloud_provider:
+        enum:
+        - aws
+        - gcp
+        - azure
+        - do
+        type: string
       created_at:
         type: string
-      email:
+      description:
         type: string
       id:
         type: string
       name:
         type: string
+      settings:
+        type: object
       updated_at:
         type: string
+      user_id:
+        type: string
     required:
-    - email
+    - cloud_provider
     - name
+    - user_id
     type: object
   types.APIError:
     properties:
@@ -95,18 +103,22 @@ info:
   title: IaC Studio API
   version: "1.0"
 paths:
-  /auth/login:
-    post:
+  /projects:
+    get:
       consumes:
       - application/json
-      description: Authenticate user and return JWT token
+      description: Get all projects for authenticated user with pagination
       parameters:
-      - description: Login credentials
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.LoginRequest'
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
@@ -117,7 +129,55 @@ paths:
             - $ref: '#/definitions/types.APIResponse'
             - properties:
                 data:
-                  $ref: '#/definitions/handlers.AuthResponse'
+                  items:
+                    $ref: '#/definitions/models.Project'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: List projects
+      tags:
+      - Projects
+    post:
+      consumes:
+      - application/json
+      description: Create a new infrastructure project
+      parameters:
+      - description: Project details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Project'
               type: object
         "400":
           description: Bad Request
@@ -146,71 +206,93 @@ paths:
                 error:
                   $ref: '#/definitions/types.APIError'
               type: object
-      summary: Login
-      tags:
-      - auth
-  /auth/logout:
-    post:
-      consumes:
-      - application/json
-      description: Logout user (client-side token removal)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.APIResponse'
       security:
       - BearerAuth: []
-      summary: Logout
+      summary: Create project
       tags:
-      - auth
-  /auth/refresh:
-    post:
+      - Projects
+  /projects/{id}:
+    delete:
       consumes:
       - application/json
-      description: Refresh JWT token (not implemented yet)
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/types.APIResponse'
-        "501":
-          description: Not Implemented
-          schema:
-            $ref: '#/definitions/types.APIResponse'
-      security:
-      - BearerAuth: []
-      summary: Refresh token
-      tags:
-      - auth
-  /auth/register:
-    post:
-      consumes:
-      - application/json
-      description: Create a new user account with email and password
+      description: Archive a project (soft delete)
       parameters:
-      - description: Registration details
-        in: body
-        name: request
+      - description: Project ID
+        format: uuid
+        in: path
+        name: id
         required: true
-        schema:
-          $ref: '#/definitions/handlers.RegisterRequest'
+        type: string
       produces:
       - application/json
       responses:
-        "201":
-          description: Created
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/types.APIResponse'
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Delete project
+      tags:
+      - Projects
+    get:
+      consumes:
+      - application/json
+      description: Get a specific project by ID
+      parameters:
+      - description: Project ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
             allOf:
             - $ref: '#/definitions/types.APIResponse'
             - properties:
                 data:
-                  additionalProperties: true
-                  type: object
+                  $ref: '#/definitions/models.Project'
               type: object
         "400":
           description: Bad Request
@@ -221,8 +303,8 @@ paths:
                 error:
                   $ref: '#/definitions/types.APIError'
               type: object
-        "409":
-          description: Conflict
+        "401":
+          description: Unauthorized
           schema:
             allOf:
             - $ref: '#/definitions/types.APIResponse'
@@ -230,8 +312,8 @@ paths:
                 error:
                   $ref: '#/definitions/types.APIError'
               type: object
-        "500":
-          description: Internal Server Error
+        "404":
+          description: Not Found
           schema:
             allOf:
             - $ref: '#/definitions/types.APIResponse'
@@ -239,9 +321,81 @@ paths:
                 error:
                   $ref: '#/definitions/types.APIError'
               type: object
-      summary: Register a new user
+      security:
+      - BearerAuth: []
+      summary: Get project
       tags:
-      - auth
+      - Projects
+    put:
+      consumes:
+      - application/json
+      description: Update an existing project
+      parameters:
+      - description: Project ID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateProjectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Project'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "403":
+          description: Forbidden
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            allOf:
+            - $ref: '#/definitions/types.APIResponse'
+            - properties:
+                error:
+                  $ref: '#/definitions/types.APIError'
+              type: object
+      security:
+      - BearerAuth: []
+      summary: Update project
+      tags:
+      - Projects
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and JWT token.
